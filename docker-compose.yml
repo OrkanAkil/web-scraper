@@ -1,0 +1,120 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: scrapepilot-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-scrapepilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scrapepilot_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-scrapepilot}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scrapepilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: scrapepilot-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scrapepilot-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-scrapepilot}:${POSTGRES_PASSWORD:-scrapepilot_secret}@db:5432/${POSTGRES_DB:-scrapepilot}
+      SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-scrapepilot}:${POSTGRES_PASSWORD:-scrapepilot_secret}@db:5432/${POSTGRES_DB:-scrapepilot}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-super-secret-key}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scrapepilot-worker
+    restart: unless-stopped
+    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-scrapepilot}:${POSTGRES_PASSWORD:-scrapepilot_secret}@db:5432/${POSTGRES_DB:-scrapepilot}
+      SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-scrapepilot}:${POSTGRES_PASSWORD:-scrapepilot_secret}@db:5432/${POSTGRES_DB:-scrapepilot}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-super-secret-key}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scrapepilot-beat
+    restart: unless-stopped
+    command: celery -A app.worker.celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-scrapepilot}:${POSTGRES_PASSWORD:-scrapepilot_secret}@db:5432/${POSTGRES_DB:-scrapepilot}
+      SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-scrapepilot}:${POSTGRES_PASSWORD:-scrapepilot_secret}@db:5432/${POSTGRES_DB:-scrapepilot}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-super-secret-key}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: scrapepilot-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+
+volumes:
+  postgres_data:
+  redis_data:
