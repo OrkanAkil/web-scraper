@@ -51,8 +51,8 @@ A **production-grade web scraping studio** with a full-featured UI, real-time mo
 ### Launch
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/scrapepilot.git
-cd scrapepilot
+git clone https://github.com/OrkanAkil/web-scraper.git
+cd web-scraper
 
 # Start all services (PostgreSQL, Redis, Backend, Worker, Beat, Frontend)
 docker-compose up --build
@@ -174,6 +174,25 @@ Portfolio screenshot pages:
 - CSS selector parsing may need adjustment for complex DOM structures
 - Share links don't support password protection (token-only)
 - Scheduled jobs require Celery Beat container to be running
+
+## 🗺️ What I'd Add Next
+
+If this were a production SaaS rather than a portfolio demo, the next iteration would focus on:
+
+- **Multi-user auth and team workspaces** — JWT + role-based access, per-workspace project isolation
+- **Proxy rotation pool** — healthcheck-aware proxy selection, optional integration with commercial providers (Oxylabs, Bright Data)
+- **Async static engine** — migrate from `httpx` sync worker to full `aiohttp`/`asyncio` for ~2-3x throughput on lightweight scrapes
+- **ML-assisted selector inference** — given a sample page and a target column, suggest candidate CSS selectors automatically
+- **Direct export integrations** — push results to Google Sheets, Airtable, and S3 without the CSV-download middle step
+- **Browser fingerprint randomization** — rotate UA, viewport, and timezone per run to reduce detection on dynamic scrapes
+- **CLI companion** — `scrapepilot run <project-id>` for CI/scripting use cases
+
+## 👤 Author
+
+**Orkan Akil** — Python Developer focused on AI integrations, web scraping, and automation pipelines.
+
+- GitHub: [@OrkanAkil](https://github.com/OrkanAkil)
+- Open to freelance work on Upwork / Contra (details in GitHub profile)
 
 ## 📄 License
 
